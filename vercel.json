@@ -1,0 +1,9 @@
+﻿{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "functions": {
+    "app.py": {
+      "maxDuration": 30,
+      "includeFiles": "{ABC_Credit/results_v6_local/abc_credit_model_bundle.joblib,chatbot/catalog.json,chatbot/static/**}"
+    }
+  }
+}

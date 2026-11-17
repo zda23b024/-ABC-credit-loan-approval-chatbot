@@ -1,0 +1,22 @@
+﻿# Keep applicant and training data, local test output, and academic artifacts
+# out of Vercel deployments. The saved model is intentionally retained in the
+# server-side function bundle and is not exposed as a public static file.
+training_data.csv
+ABC_Credit_Model_Training.ipynb
+ABC_Credit_Chatbot_Submission.zip
+ABC_Credit_*.pdf
+ABC_Credit_Academic_Report.html
+PGAI Project_ABC Credit Loan Approval Chatbot.docx
+tests/
+.test_audit_*/
+chatbot/data/audit/
+ABC_Credit/results_v6_local/*.csv
+ABC_Credit/results_v6_local/*.json
+__pycache__/
+**/__pycache__/
+*.py[cod]
+.env
+.env.*
+!.env.example
+.venv/
+venv/
