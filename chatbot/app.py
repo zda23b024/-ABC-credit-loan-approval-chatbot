@@ -28,7 +28,10 @@ MODEL_PATH = ROOT / 'ABC_Credit' / 'results_v6_local' / 'abc_credit_model_bundle
 CATALOG_PATH = CHATBOT_DIR / 'catalog.json'
 AUDIT_PATH = Path(os.environ.get(
     'ABC_CREDIT_AUDIT_LOG', CHATBOT_DIR / 'data' / 'audit' / 'applications.jsonl'))
-VERCEL_DEPLOYMENT = os.environ.get('VERCEL') == '1'
+HOSTED_DEMO_DEPLOYMENT = (
+    os.environ.get('VERCEL') == '1'
+    or bool(os.environ.get('RAILWAY_ENVIRONMENT_NAME'))
+)
 
 if not MODEL_PATH.exists():
     raise RuntimeError(f'Trained model bundle not found: {MODEL_PATH}')
@@ -182,8 +185,8 @@ def home():
 def health():
     return {'status': 'ready', 'model_name': BUNDLE.get('model_name'),
             'feature_set': BUNDLE.get('feature_set'), 'threshold': BUNDLE['threshold_declined'],
-            'deployment_mode': 'synthetic_demo' if VERCEL_DEPLOYMENT else 'local',
-            'persistent_audit_logging': not VERCEL_DEPLOYMENT}
+            'deployment_mode': 'synthetic_demo' if HOSTED_DEMO_DEPLOYMENT else 'local',
+            'persistent_audit_logging': not HOSTED_DEMO_DEPLOYMENT}
 
 
 @app.get('/api/catalog')
@@ -322,14 +325,14 @@ def decision(answers: ApplicationAnswers):
                   'decision': predicted_decision},
         'latency_ms': latency_ms,
     }
-    if not VERCEL_DEPLOYMENT:
+    if not HOSTED_DEMO_DEPLOYMENT:
         try:
             _append_audit(audit)
         except OSError:
             LOGGER.exception('Audit log write failed')
             raise HTTPException(status_code=503, detail='Could not record this application. No assessment was returned.')
-    result['persistent_audit_logging'] = not VERCEL_DEPLOYMENT
-    result['deployment_mode'] = 'synthetic_demo' if VERCEL_DEPLOYMENT else 'local'
+    result['persistent_audit_logging'] = not HOSTED_DEMO_DEPLOYMENT
+    result['deployment_mode'] = 'synthetic_demo' if HOSTED_DEMO_DEPLOYMENT else 'local'
     return result
 
 

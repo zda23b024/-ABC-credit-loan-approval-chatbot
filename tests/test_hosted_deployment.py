@@ -1,23 +1,41 @@
-﻿"""Vercel-mode compatibility checks using FastAPI's local ASGI test client."""
+"""Hosted deployment checks using FastAPI's local ASGI test client."""
 from __future__ import annotations
 
+import json
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
+import lightgbm
 from fastapi.testclient import TestClient
 
 from chatbot import app as backend
 from credit_model_runtime import load_model_bundle, predict_applicants
 from chatbot.app import ApplicationAnswers, build_model_row
-from app import app as vercel_app
+from app import app as hosted_app
 
 
-class VercelCompatibilityTests(unittest.TestCase):
+class HostedDeploymentTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.client = TestClient(vercel_app)
+        cls.client = TestClient(hosted_app)
         cls.bundle = load_model_bundle()
         cls.vehicle = backend.CATALOG['vehicles'][0]
+
+    def test_railpack_installs_openmp_in_the_runtime_environment(self):
+        root = Path(__file__).resolve().parents[1]
+        config = json.loads((root / 'railpack.json').read_text(encoding='utf-8'))
+        requirements = (root / 'requirements.txt').read_text(encoding='utf-8')
+        self.assertEqual(config['provider'], 'python')
+        self.assertEqual(config['packages']['python'], '3.12')
+        self.assertIn('libgomp1', config['deploy']['aptPackages'])
+        self.assertIn('$PORT', config['deploy']['startCommand'])
+        self.assertNotIn('OMP_NUM_THREADS', config['deploy']['startCommand'])
+        self.assertIn('lightgbm==4.7.0', requirements)
+        self.assertEqual(lightgbm.__version__, '4.7.0')
+        self.assertFalse((root / 'Dockerfile.vercel').exists())
+        self.assertTrue(self.bundle['model'])
+        self.assertEqual(self.bundle['threshold_declined'], 0.13995426939656921)
 
     def answers(self, qualification, loan_band, price_band):
         return {
@@ -30,8 +48,8 @@ class VercelCompatibilityTests(unittest.TestCase):
             'has_active_loan': False, 'consent_to_log': True,
         }
 
-    def test_deployed_style_routes_and_hosted_logging_notice(self):
-        with patch.object(backend, 'VERCEL_DEPLOYMENT', True):
+    def test_hosted_style_routes_and_logging_notice(self):
+        with patch.object(backend, 'HOSTED_DEMO_DEPLOYMENT', True):
             home = self.client.get('/')
             script = self.client.get('/static/app.js?v=answer-review')
             css = self.client.get('/static/styles.css?v=answer-review')
@@ -48,7 +66,7 @@ class VercelCompatibilityTests(unittest.TestCase):
             ('APPROVED', self.answers('GRAD', 'under_50000', 'under_75000')),
             ('DECLINED', self.answers('SSC', '100000_124999', '75000_94999')),
         ]
-        with patch.object(backend, 'VERCEL_DEPLOYMENT', True), \
+        with patch.object(backend, 'HOSTED_DEMO_DEPLOYMENT', True), \
              patch.object(backend, '_append_audit', side_effect=AssertionError('hosted mode must not write a file')):
             for expected_label, payload in cases:
                 with self.subTest(decision=expected_label):

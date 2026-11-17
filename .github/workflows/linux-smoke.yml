@@ -1,0 +1,38 @@
+name: Linux runtime smoke test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install the operating-system OpenMP runtime
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes libgomp1
+          ldconfig -p | grep 'libgomp.so.1'
+      - name: Install pinned Python dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Verify LightGBM and load the saved bundle
+        run: |
+          python -c "import lightgbm; print('LightGBM', lightgbm.__version__)"
+          python -c "from credit_model_runtime import load_model_bundle; b=load_model_bundle(); assert b['threshold_declined'] == 0.13995426939656921; print('Model bundle and threshold loaded')"
+      - name: Test API predictions, routes, and validation
+        run: python -m unittest discover -s tests -v
+      - name: Test frontend flow and syntax
+        run: |
+          node --check chatbot/static/app.js
+          node tests/test_chatbot_ui_flow.js

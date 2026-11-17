@@ -44,12 +44,17 @@ node --check chatbot\static\app.js
 node tests\test_chatbot_ui_flow.js
 ```
 
-## Deploy to Vercel
+## Deployment
 
-The root [VERCEL_DEPLOYMENT.md](VERCEL_DEPLOYMENT.md) covers GitHub setup,
-runtime configuration, environment variables, and hosted-demo limitations.
-Vercel serves the existing FastAPI app and browser UI from one origin. The
-hosted version is synthetic-data only and does not persist audit records.
+The pinned LightGBM Linux wheel requires the system library `libgomp.so.1`.
+Vercel's standard Python Function does not provide a supported system-package
+installation step, so that backend cannot load the model there. Docker is not
+used. The prepared alternative is Railway's native Railpack builder, configured
+in `railpack.json` to install `libgomp1` and serve the same FastAPI UI and API.
+See [RAILWAY_DEPLOYMENT.md](RAILWAY_DEPLOYMENT.md) and
+[VERCEL_DEPLOYMENT.md](VERCEL_DEPLOYMENT.md).
+
+The hosted version is synthetic-data only and does not persist audit records.
 
 ## Results and scope
 
