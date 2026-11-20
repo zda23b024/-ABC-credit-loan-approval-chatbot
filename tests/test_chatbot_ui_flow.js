@@ -70,28 +70,13 @@ const document = {
   createTextNode: text => new TextNode(text),
 };
 const catalog = {
-  qualifications:[{value:'GRAD',label:'Graduate'},{value:'SSC',label:'Secondary'}],
-  employment_types:[{value:'SAL',label:'Salaried'}],
-  residences:[{value:'O',label:'Owned'}],
-  area_tiers:[{value:'01 Megapolis (A)',label:'Megapolis A'}],
+  employment_types:[{value:'SAL',label:'Salaried'},{value:'SEP',label:'Self-employed'}],
   vehicle_types:[{value:'MC',label:'Motorcycle'},{value:'SC',label:'Scooter'}],
-  vehicles:[
-    {description:'Roadster MC',product_code:'MC',make_code:'Maker M'},
-    {description:'Commuter MC',product_code:'MC',make_code:'Maker M'},
-    {description:'Scoot SC',product_code:'SC',make_code:'Maker S'},
-  ],
-  representative_values:{
-    age_band:{'18-25':22,'26-35':30,'36-45':40,'46-60':53},
-    income_band:{'0':0,under_15000:10000},
-    loan_band:{under_50000:40000,'200000_plus':225000},
-    vehicle_price_band:{under_75000:65000,'75000_94999':85000,'155000_174999':165000,'175000_plus':200000},
-  },
 };
 let submitted = null;
 let decisionRequests = 0;
 async function fetchStub(url, options = {}) {
   if (url === '/api/catalog') return {ok:true,json:async()=>catalog};
-  if (url === '/api/health') return {ok:true,json:async()=>({deployment_mode:'local',persistent_audit_logging:true})};
   assert.equal(url,'/api/decision');
   decisionRequests += 1;
   submitted = JSON.parse(options.body);
@@ -119,65 +104,61 @@ const currentQuestionForm = () => {assert.ok(form(),'question form is shown');re
   consent.querySelector('input').checked = true;
   submit();
 
-  // Answer question 1, use Back from question 2, and return without losing progress.
-  choose('18-25'); submit();
-  currentQuestionForm().querySelector('.secondary-button').click();
-  assert.match(elements.chat.textContent,/Edit answer: What is the applicant/);
-  assert.equal(form().querySelector('.input-control').value,'18–25 years');
+  // Answer age, go back from question 2, and return without losing the answer.
+  form().querySelector('.input-control').value='30';
   submit();
-  choose('GRAD'); submit();
+  currentQuestionForm().querySelector('.secondary-button').click();
+  assert.match(elements.chat.textContent,/Edit answer: What is your age/);
+  assert.equal(form().querySelector('.input-control').value,'30 years');
+  submit();
   choose('SAL'); submit();
-  choose('0'); submit();
-  choose('O'); submit();
-  choose('01 Megapolis (A)'); submit();
+  form().querySelector('.input-control').value='42000';
+  submit();
   choose('MC'); submit();
-  form().querySelector('select').value='Roadster MC';
-  form().querySelector('select').dispatch('change'); submit();
-  choose('under_50000'); submit();
-  choose('under_75000'); submit();
+  form().querySelector('.input-control').value='100000';
+  submit();
+  form().querySelector('.input-control').value='125000';
+  submit();
   choose('no'); submit();
 
-  // The applicant sees all 11 answers before the model is called.
+  // The applicant sees all seven answers before the model is called.
   let review = elements.chat.querySelector('.review-message');
   assert.ok(review);
-  assert.equal(review.querySelectorAll('.review-item').length,11);
+  assert.equal(review.querySelectorAll('.review-item').length,7);
   assert.equal(decisionRequests,0);
 
   // Edit age from the review and return to the review screen.
-  editButtons()[0].click(); choose('36-45'); submit();
+  editButtons()[0].click();
+  form().querySelector('.input-control').value='36';
+  submit();
   review = elements.chat.querySelector('.review-message');
-  assert.match(review.textContent,/36–45 years/);
-  assert.match(elements.chat.textContent,/Updated answer: 36–45 years/);
+  assert.match(review.textContent,/36 years/);
+  assert.match(elements.chat.textContent,/Updated answer: 36 years/);
 
-  // Changing vehicle type invalidates the old model and asks for a matching one.
-  editButtons()[6].click(); choose('SC'); submit();
-  assert.match(elements.chat.textContent,/Choose the vehicle model/);
-  assert.deepEqual(form().querySelector('select').children.map(option=>option.value),['','Scoot SC']);
-  form().querySelector('select').value='Scoot SC';form().querySelector('select').dispatch('change');submit();
+  // Exact loan and vehicle prices recalculate LTV on review.
+  editButtons()[4].click();
+  form().querySelector('.input-control').value='180000';
+  submit();
   review = elements.chat.querySelector('.review-message');
-  assert.match(review.textContent,/Scoot SC/);
-
-  // Changing loan amount invalidates vehicle price; the new LTV is recalculated.
-  editButtons()[8].click(); choose('200000_plus'); submit();
-  assert.match(elements.chat.textContent,/Approximate total vehicle price/);
-  assert.deepEqual(form().querySelectorAll('.choice-button').map(button=>button.dataset.value),['155000_174999','175000_plus']);
-  choose('175000_plus');submit();
-  review = elements.chat.querySelector('.review-message');
-  assert.match(review.querySelector('.review-calculation').textContent,/112\.50%/);
-  assert.equal(review.querySelectorAll('.review-item').length,11);
+  assert.match(review.querySelector('.review-calculation').textContent,/144\.00%/);
+  assert.equal(review.querySelectorAll('.review-item').length,7);
   assert.equal(decisionRequests,0);
 
   const confirm = elements.composer.querySelectorAll('.send-button').find(button=>button.textContent==='Confirm and get assessment');
   assert.ok(confirm);confirm.click();await tick();await tick();
   assert.equal(decisionRequests,1);
-  assert.equal(submitted.age_band,'36-45');
-  assert.equal(submitted.qualification,'GRAD');
-  assert.equal(submitted.vehicle_type,'SC');
-  assert.equal(submitted.model_description,'Scoot SC');
-  assert.equal(submitted.loan_band,'200000_plus');
-  assert.equal(submitted.vehicle_price_band,'175000_plus');
+  assert.equal(submitted.age,36);
+  assert.equal(submitted.employment_type,'SAL');
+  assert.equal(submitted.monthly_net_income,42000);
+  assert.equal(submitted.vehicle_type,'MC');
+  assert.equal(submitted.loan_amount,180000);
+  assert.equal(submitted.vehicle_price,125000);
   assert.equal(submitted.has_active_loan,false);
   assert.equal(submitted.consent_to_log,true);
+  assert.deepEqual(Object.keys(submitted).sort(),[
+    'age','consent_to_log','employment_type','has_active_loan',
+    'loan_amount','monthly_net_income','vehicle_price','vehicle_type',
+  ]);
   assert.match(elements.chat.textContent,/APPROVED/);
-  console.log('PASS: 11 answers, Back, review/edit, dependent vehicle and price updates, LTV recalculation, confirmed submit.');
+  console.log('PASS: 7 exact answers, Back, review/edit, LTV recalculation, confirmed submit.');
 })().catch(error=>{console.error(error);process.exitCode=1;});

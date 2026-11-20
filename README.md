@@ -1,9 +1,8 @@
 # ABC Credit Loan Approval Chatbot
 
-Academic project containing reproducible training and inference code, a saved
-LightGBM model, the FastAPI chatbot, tests, and the final academic report. The
-source dataset and training notebook remain local and are intentionally ignored
-by Git to avoid publishing applicant-level data or notebook outputs.
+Academic project containing the training data and notebook, reproducible
+training and inference code, a saved LightGBM model, a local FastAPI chatbot,
+tests, and the final academic report.
 
 ## Project folders
 
@@ -12,11 +11,12 @@ by Git to avoid publishing applicant-level data or notebook outputs.
 | `chatbot/` | Browser interface, API, choice catalog, dependency list, and run instructions. |
 | `ABC_Credit/results_v6_local/` | Saved model bundle, internal test metrics, validation comparisons, inference helper, and batch predictor. |
 | `tests/` | Model/API, batch scoring, and chatbot answer-edit flow checks. |
-| `ABC_Credit_Model_Training.ipynb` | Local training and exploration notebook (not pushed). |
-| `training_data.csv` | Supplied labeled source data (local only; not pushed). |
+| `ABC_Credit_Model_Training.ipynb` | Training and exploration notebook. |
+| `training_data.csv` | Supplied labeled training data. |
 | `train_credit_model.py` | Reproducible cleaning, feature, training, calibration, and evaluation script. |
 | `credit_model_runtime.py` | Shared saved-model loading and prediction code. |
-| `ABC_Credit_Final_Academic_Report_Updated.pdf` | Final report with verified internal results and stated limitations. |
+| `MODEL_CARD.md` | Responsible AI model card, including current chatbot-input and subgroup limitations. |
+| `ABC_Credit_Overleaf_Report.pdf` | Academic report. |
 
 ## Run locally
 
@@ -31,10 +31,18 @@ python chatbot\build_catalog.py
 python -m uvicorn chatbot.app:app --host 127.0.0.1 --port 8000 --no-access-log
 ```
 
-Then open <http://127.0.0.1:8000>. The chatbot collects 11 answers, lets the
-applicant go back or edit answers, reviews all answers before submission, and
-recalculates dependent values such as LTV. It uses the saved model bundle,
-preprocessing pipeline, and threshold; it does not retrain at application time.
+Then open <http://127.0.0.1:8000>. The chatbot collects seven answers: age,
+employment status, exact monthly take-home income, two-wheeler type, exact
+requested loan amount, exact vehicle price, and existing active-loan status.
+Applicants can go back or edit answers and review them before submission. The
+exact amounts determine LTV. It uses the saved model bundle, preprocessing
+pipeline, and threshold; it does not retrain at application time.
+
+The saved model also uses qualification, residence type, area tier, vehicle
+make, model, and variant. Since the seven-question form does not collect these,
+the API leaves them missing for the saved preprocessing pipeline to impute and
+discloses this limitation with each assessment. The model was not retrained for
+the shorter questionnaire.
 
 ## Verify the project
 
@@ -43,18 +51,6 @@ python -m unittest discover -s tests -v
 node --check chatbot\static\app.js
 node tests\test_chatbot_ui_flow.js
 ```
-
-## Deployment
-
-The pinned LightGBM Linux wheel requires the system library `libgomp.so.1`.
-Vercel's standard Python Function does not provide a supported system-package
-installation step, so that backend cannot load the model there. Docker is not
-used. The prepared alternative is Railway's native Railpack builder, configured
-in `railpack.json` to install `libgomp1` and serve the same FastAPI UI and API.
-See [RAILWAY_DEPLOYMENT.md](RAILWAY_DEPLOYMENT.md) and
-[VERCEL_DEPLOYMENT.md](VERCEL_DEPLOYMENT.md).
-
-The hosted version is synthetic-data only and does not persist audit records.
 
 ## Results and scope
 

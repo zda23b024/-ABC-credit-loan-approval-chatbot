@@ -10,36 +10,31 @@ The model predicts whether an application resembles historical **APPROVED** or
 outcomes. The UI states this before collecting answers and again with the
 result. This is an academic prototype, not an operational lending service.
 
-The chatbot asks eleven short prompts: age range, highest qualification,
-employment or income type, monthly net-income range, residence status, broad
-area tier, vehicle type, exact vehicle model, loan-amount range, vehicle-price
-range, and whether there is an active prior loan. Each answer stays selected in
-the chat composer until the applicant presses **Send**. A text field stays at
-the bottom of the chat for typed answers; suggestions appear above it and fill
-the draft when tapped. Applicants can go back between questions or edit any
-answer in the 11-answer review before confirming submission. Changing vehicle
-type clears the previously selected model, and changing loan amount asks for
-vehicle price again so calculated LTV uses the current answers. The vehicle
-catalog filters model choices by selected vehicle type and maps the model to product,
-make, and variant. Numeric ranges map to representative values, while typed
-numeric answers are passed as entered; LTV is
-calculated as `100 × representative loan amount / representative vehicle
-price`. The range-based result is approximate. Gender, Pincode, and ID are not
-collected; the saved model does not use those fields. The saved model does use
-`Final_Tier`, so the UI asks for a broad area tier without an
-exact address. `Final_Tier` is location-related and should be checked for
-application-time availability and proxy discrimination; the assignment notebook
-also flags it for review.
+The chatbot asks exactly seven questions: age, employment status, exact
+monthly take-home income, two-wheeler type (motorcycle, scooter, moped, or
+electric), exact requested loan amount, exact vehicle price, and whether there
+is an existing active loan. Applicants can go back between questions and edit
+any answer in the seven-answer review before confirming submission. The exact
+loan and vehicle prices determine `LTV = 100 × loan amount / vehicle price`.
+Numeric answers are used as entered; no ranges or representative amounts are
+used. Gender, Pincode, name, and contact details are not collected.
 
-Typed numeric answers pass through unchanged. Range choices use the server's
-single set of representative values, and the result identifies each value used;
-vehicle price is only used to derive `LTV = 100 × loan amount / vehicle price`.
-The binary prior-loan answer maps `Yes` to `PAST_LOANS_ACTIVE` and `No` to
+The existing saved model still uses qualification, residence type, area tier,
+vehicle make, exact model, and model variant in addition to the answers above.
+The shorter form does not ask those questions: their model inputs are left
+missing and passed through the saved preprocessing pipeline's imputers and
+unknown-category handling. The model was not retrained for this questionnaire,
+so estimates may be less reliable; the UI discloses this with each result.
+`Final_Tier` is location-related and remains a model input despite not being
+collected. Review its availability and proxy-discrimination risks before any
+use beyond this academic prototype.
+
+The binary active-loan answer maps `Yes` to `PAST_LOANS_ACTIVE` and `No` to
 `NO_PAST_LOANS`, matching the training categories. The assignment describes
-this field as whether a prior loan is currently active, while the negative
-category name literally says no past loans; the source data has no separate
-category for previously settled loans. Confirm that definition before using the
-question outside this project.
+this as whether a prior loan is currently active, while the negative category
+literally says no past loans; the source data has no separate category for
+previously settled loans. Confirm that definition before using the question
+outside this project.
 
 ## Run locally on Windows
 
@@ -71,10 +66,10 @@ node --check chatbot\static\app.js
 node tests\test_chatbot_ui_flow.js
 ```
 
-The JavaScript harness exercises all 11 answers, back navigation, answer edits,
-dependent vehicle/model and loan/price updates, LTV recalculation, and the
-confirmation step. Python tests cover saved-model inference, API prediction,
-threshold behavior, audit records, and batch scoring.
+The JavaScript harness exercises all seven answers, back navigation, answer
+edits, LTV recalculation, and the confirmation step. Python tests cover
+saved-model inference with omitted inputs, API prediction, threshold behavior,
+audit records, and batch scoring.
 
 ## Batch scoring for a new CSV
 
@@ -98,19 +93,20 @@ the decision label reflects past application decisions, not repayment ability.
 
 ## Flow and audit record
 
-The API validates age, category values, amount fields, vehicle model, and the
-derived LTV before it invokes the saved preprocessing and model pipeline. It
-returns the model probabilities, the bundle's decline threshold, the selected
+The API validates age, category values, exact amount fields, and the derived
+LTV before it invokes the saved preprocessing and model pipeline. It returns
+the model probabilities, the bundle's decline threshold, the selected
 historical-decision label, model latency, and a pseudonymous session reference.
 
 After consent, each completed submission is appended to
-`chatbot/data/audit/applications.jsonl`. The record contains the answers,
-model-ready feature values, score, threshold, decision, and latency for project
-audit. The chatbot does not collect names, phone numbers, exact postal codes,
-account IDs, or IP addresses. Audit rows still contain sensitive financial and
-demographic answers: keep the local folder access-controlled, do not share the
-log, and delete it when it is no longer needed. The audit directory is excluded
-from Git by the project `.gitignore`.
+`chatbot/data/audit/applications.jsonl`. The record contains the seven answers,
+model-ready feature values (including missing inputs for unasked features),
+score, threshold, decision, and latency for project audit. The chatbot does
+not collect names, phone numbers, exact postal codes, account IDs, or IP
+addresses. Audit rows still contain sensitive financial and demographic
+answers: keep the local folder access-controlled, do not share the log, and
+delete it when it is no longer needed. The audit directory is excluded from
+Git by the project `.gitignore`.
 
 ## Production boundary
 
